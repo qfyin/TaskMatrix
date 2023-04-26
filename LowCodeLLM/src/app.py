@@ -1,22 +1,37 @@
 import os
-from flask import Flask, request, send_from_directory
+from flask import Flask, request, send_from_directory, abort
 from flask_cors import CORS, cross_origin
 from lowCodeLLM import lowCodeLLM
 from flask.logging import default_handler
 import logging
+import sys
 
-app = Flask('lowcode-llm', static_folder='', template_folder='')
+app = Flask('lowcode-llm', template_folder='')
 app.debug = True
 llm = lowCodeLLM()
 gunicorn_logger = logging.getLogger('gunicorn.error')
+
 app.logger = gunicorn_logger
 logging_format = logging.Formatter(
     '%(asctime)s - %(levelname)s - %(filename)s - %(funcName)s - %(lineno)s - %(message)s')
 default_handler.setFormatter(logging_format)
 
+stdout_handler = logging.StreamHandler(sys.stdout)
+stdout_handler.setFormatter(logging_format)
+app.logger.addHandler(stdout_handler)
+
 @app.route("/")
 def index():
     return send_from_directory(".", "index.html")
+
+@app.route("/<path:filename>")
+def static_files(filename):
+    for ext in ('.html', '.htm', '.js', '.css', '.png', '.jpg', '.jpeg', '.gif', '.ico', '.svg'):
+        if filename.endswith(ext):
+            return send_from_directory(".", filename)
+    else:
+        app.logger.error("Unspported file extension: " + filename)
+        abort(404)
 
 @app.route('/api/get_workflow', methods=['POST'])
 @cross_origin()
